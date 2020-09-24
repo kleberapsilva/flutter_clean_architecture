@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_clean_architecture/flutter_clean_architecture.dart';
 import 'package:logging/logging.dart';
 import 'package:meta/meta.dart';
+import 'package:provider/provider.dart';
 
 /// A Clean Architecture [Controller]. Should be aggregated within a `ViewState` or
 /// a `View`. However, it is preferable to be contained inside the `View` for readibility
@@ -105,13 +107,12 @@ abstract class Controller
     }
   }
 
-  /// _refreshes the [View] associated with the [Controller] if it is still mounted.
+  /// _refreshes the [ControlledWidgets] and the [StatefulWidgets] that depends on [FlutterCleanArchitecture.getController] of the [View] associated with the [Controller] if it is still mounted.
   @protected
   void refreshUI() {
     if (_isMounted) {
       notifyListeners();
     }
-    ;
   }
 
   /// Unmounts the [Controller] from the `View`. Called by the `View` automatically.
@@ -252,4 +253,56 @@ abstract class Controller
   ///     }
   /// ```
   void onDetached() {}
+}
+
+typedef ControlledBuilder<Con extends Controller> = Widget Function(
+    BuildContext context, Con controller);
+
+/// This is a representation of a widget that is controlled by a [Controller] and needs to be re-rendered when
+/// [Controller.refreshUI] is triggered.
+///
+/// This was created to optimize the render cycle from a [ViewState]'s widget tree.
+///
+/// When [Controller.refreshUI] is called, only the ControlledWidgets inside [ViewState.view] will be re-rendered.
+///
+/// Example:
+///
+/// ```dart
+///   class ExamplePage extends View {
+///     @override
+///     State<StatefulWidget> createState() => ExampleState();
+///   }
+///
+///   class ExampleState extends ViewState<ExamplePage, ExampleController> {
+///     ExampleState() : super(ExampleController());
+///
+///     Widget get view {
+///       return Scaffold(
+///         key: globalKey,
+///         body: SingleChildScrollView(
+///           child: Column(
+///             children: [
+///               Text("Uncontrolled title that will not re-render"),
+///               ControlledWidgetBuilder(
+///                 builder: (context, controller) {
+///                   // Controlled widget that depends on controllers value
+///                   return Text(controller.foo);
+///                 }
+///               )
+///             ]
+///           )
+///         )
+///       )
+///     }
+///   }
+/// ``
+class ControlledWidgetBuilder<Con extends Controller> extends StatelessWidget {
+  final ControlledBuilder<Con> builder;
+
+  ControlledWidgetBuilder({@required this.builder});
+
+  @override
+  Widget build(BuildContext context) => Consumer<Con>(
+      builder: (BuildContext context, Con controller, _) =>
+          builder(context, controller));
 }
